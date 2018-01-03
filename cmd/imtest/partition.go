@@ -21,12 +21,12 @@ func (part *Partition) AddPoints(points []*Point, applyColor bool) {
 		if part.ShouldContain(p) {
 			part.Points = append(part.Points, p)
 			if applyColor {
-				p.C = part.C
+				p.SetColor(part.C)
 			} else if p.C == part.C {
 				if p.Frozen {
-					p.C = FROZEN_COLOR
+					p.SetColor(FROZEN_COLOR)
 				} else {
-					p.C = POINT_COLOR
+					p.SetColor(POINT_COLOR)
 				}
 			}
 		}

@@ -14,28 +14,40 @@ type Point struct {
 	C      color.RGBA
 	Frozen bool
 	v      *imdraw.IMDraw
+	dirty  bool
 }
 
 // KILL ALL HUMANS
 func NewPoint(x, y, r float64) *Point {
-	return &Point{x, y, r, POINT_COLOR, false, imdraw.New(nil)}
+	return &Point{x, y, r, POINT_COLOR, false, imdraw.New(nil), true}
+}
+
+func (p *Point) SetColor(c color.RGBA) {
+	p.C = c
+	p.dirty = true
 }
 
 func (p *Point) Draw() {
-	p.v.Reset()
-	p.v.Clear()
-	p.v.Color = p.C
-	p.v.Push(pixel.V(p.X, p.Y))
-	p.v.Circle(p.R, 0)
+	if p.dirty {
+		p.v.Reset()
+		p.v.Clear()
+		p.v.Color = p.C
+		p.v.Push(pixel.V(p.X, p.Y))
+		p.v.Circle(p.R, 0)
+
+		p.dirty = false
+	}
 }
 
 func (p *Point) UpdatePosition() {
 	if !p.Frozen {
-		p.X += randFloat(-5, 5)
-		p.Y += randFloat(-5, 5)
+		p.X += randFloat(-POINT_SPEED, POINT_SPEED)
+		p.Y += randFloat(-POINT_SPEED, POINT_SPEED)
 
 		p.X = clamp(p.X, 0, WIDTH)
 		p.Y = clamp(p.Y, 0, HEIGHT)
+
+		p.dirty = true
 	}
 }
 

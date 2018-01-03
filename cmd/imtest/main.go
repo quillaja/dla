@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"image/color"
+	"math"
 	"math/rand"
 	"time"
 
@@ -13,14 +14,24 @@ import (
 )
 
 const (
-	WIDTH  = 1200
-	HEIGHT = 900
+	WIDTH         = 1200
+	HEIGHT        = 900
+	POINT_MAXSIZE = 10
+	POINT_SPEED   = 2
 )
 
 var (
-	POINT_COLOR  = colornames.Cornflowerblue
-	FROZEN_COLOR = colornames.Black
+	POINT_COLOR      = colornames.Cornflowerblue
+	FROZEN_COLOR     = colornames.Ivory
+	BACKGROUND_COLOR = colornames.Black
 )
+
+type camera struct {
+	Position pixel.Vec
+	Speed    float64
+	Zoom     float64
+	ZSpeed   float64
+}
 
 func randFloat(low, high float64) float64 {
 	return rand.Float64()*(high-low) + low
@@ -36,19 +47,12 @@ func clamp(num, min, max float64) float64 {
 	return num
 }
 
-func addRandPoints(points []*Point, num ...int) []*Point {
-	if len(num) < 1 {
-		num = append(num, 50)
-	}
-	if len(num) < 2 {
-		num = append(num, 5)
-	}
-
-	for i := 0; i < num[0]; i++ {
+func addRandPoints(points []*Point, num int) []*Point {
+	for i := 0; i < num; i++ {
 		points = append(points, NewPoint(
 			randFloat(0, WIDTH),
 			randFloat(0, HEIGHT),
-			float64(num[1])))
+			randFloat(3, POINT_MAXSIZE)))
 	}
 	return points
 }
@@ -67,7 +71,7 @@ func run() {
 	}
 
 	// create points
-	numPoints := 1000
+	numPoints := 200
 	points := make([]*Point, 0, numPoints)
 	points = addRandPoints(points, numPoints)
 
@@ -101,8 +105,13 @@ func run() {
 		}
 	}
 
+	// camera
+	cam := camera{Position: pixel.V(WIDTH/2, HEIGHT/2), Speed: 250.0, Zoom: 1.0, ZSpeed: 1.1}
+	last := time.Now()
+
 	// options
 	showPartitions := false
+	paused := false
 
 	// performance
 	frames := 0
@@ -113,56 +122,88 @@ func run() {
 	go func() {
 
 		for !win.Closed() {
-			for _, p := range points {
-				p.UpdatePosition()
-			}
+			if !paused {
+				for _, p := range points {
+					p.UpdatePosition()
+				}
 
-			// separate into quadrants
-			for _, part := range partitions {
-				part.ClearPoints()
-				part.AddPoints(points, showPartitions)
-			}
+				// separate into quadrants
+				for _, part := range partitions {
+					part.ClearPoints()
+					part.AddPoints(points, showPartitions)
+				}
 
-			// collide within partitions
-			for _, part := range partitions {
-				part.CollideWithin(
-					func(p, other *Point) bool {
-						return p.Collides(other)
-					},
-					func(p *Point) {
-						p.C = FROZEN_COLOR
-						p.Frozen = true
-					})
-			}
+				// collide within partitions
+				for _, part := range partitions {
+					part.CollideWithin(
+						func(p, other *Point) bool {
+							return p.Collides(other)
+						},
+						func(p *Point) {
+							p.SetColor(FROZEN_COLOR)
+							p.Frozen = true
+						})
+				}
 
-			iterations++
+				iterations++
+			}
 		}
 	}()
 
 	for !win.Closed() {
 
+		dt := time.Since(last).Seconds()
+		last = time.Now()
+
+		camMatrix := pixel.IM.
+			Scaled(cam.Position, cam.Zoom).
+			Moved(win.Bounds().Center().Sub(cam.Position))
+		win.SetMatrix(camMatrix)
+
+		// update user controlled things
+		if win.Pressed(pixelgl.KeyLeft) {
+			cam.Position.X -= cam.Speed * dt
+		}
+		if win.Pressed(pixelgl.KeyRight) {
+			cam.Position.X += cam.Speed * dt
+		}
+		if win.Pressed(pixelgl.KeyDown) {
+			cam.Position.Y -= cam.Speed * dt
+		}
+		if win.Pressed(pixelgl.KeyUp) {
+			cam.Position.Y += cam.Speed * dt
+		}
+		// allow toggle paused
+		if win.JustPressed(pixelgl.KeyP) {
+			paused = !paused
+		}
 		// allow toggle of coloring to show partitions
 		if win.JustPressed(pixelgl.KeyB) {
 			showPartitions = !showPartitions
 		}
+		cam.Zoom *= math.Pow(cam.ZSpeed, win.MouseScroll().Y)
 
-		batch.Clear()
+		if !paused {
+			batch.Clear()
 
-		// draw to batch
-		for _, p := range points {
-			p.Draw()
-			p.Visual().Draw(batch)
+			// draw to batch
+			for _, p := range points {
+				// if .Left-p.R <= p.X && p.X <= .Right+p.R &&
+				// .Bottom-p.R <= p.Y && p.Y <= .Top+p.R {
+				p.Draw()
+				p.Visual().Draw(batch)
+			}
+
 		}
-
 		// draw batch to window
-		win.Clear(colornames.White)
+		win.Clear(BACKGROUND_COLOR)
 		batch.Draw(win)
 
 		win.Update()
 
 		//add more points if space bar pressed
 		if win.JustPressed(pixelgl.KeySpace) {
-			points = addRandPoints(points, 50, rand.Intn(8)+3)
+			points = addRandPoints(points, 50)
 			fmt.Println("num points:", len(points))
 		}
 
@@ -173,7 +214,6 @@ func run() {
 				frames, iterations))
 			frames = 0
 			iterations = 0
-
 		default:
 		}
 	}
