@@ -17,6 +17,11 @@ const (
 	HEIGHT = 900
 )
 
+var (
+	POINT_COLOR  = colornames.Cornflowerblue
+	FROZEN_COLOR = colornames.Black
+)
+
 func randFloat(low, high float64) float64 {
 	return rand.Float64()*(high-low) + low
 }
@@ -62,13 +67,13 @@ func run() {
 	}
 
 	// create points
-	numPoints := 200
+	numPoints := 1000
 	points := make([]*Point, 0, numPoints)
 	points = addRandPoints(points, numPoints)
 
 	// create seed in center
 	seed := NewPoint(WIDTH/2, HEIGHT/2, 2)
-	seed.C = colornames.Black
+	seed.C = FROZEN_COLOR
 	seed.Frozen = true
 	points = append(points, seed)
 
@@ -96,56 +101,78 @@ func run() {
 		}
 	}
 
+	// options
+	showPartitions := false
+
 	// performance
 	frames := 0
+	iterations := 0
 	second := time.Tick(1 * time.Second)
+
+	// run logic
+	go func() {
+
+		for !win.Closed() {
+			for _, p := range points {
+				p.UpdatePosition()
+			}
+
+			// separate into quadrants
+			for _, part := range partitions {
+				part.ClearPoints()
+				part.AddPoints(points, showPartitions)
+			}
+
+			// collide within partitions
+			for _, part := range partitions {
+				part.CollideWithin(
+					func(p, other *Point) bool {
+						return p.Collides(other)
+					},
+					func(p *Point) {
+						p.C = FROZEN_COLOR
+						p.Frozen = true
+					})
+			}
+
+			iterations++
+		}
+	}()
 
 	for !win.Closed() {
 
+		// allow toggle of coloring to show partitions
+		if win.JustPressed(pixelgl.KeyB) {
+			showPartitions = !showPartitions
+		}
+
 		batch.Clear()
 
-		// draw
+		// draw to batch
 		for _, p := range points {
-			p.UpdatePosition()
 			p.Draw()
 			p.Visual().Draw(batch)
 		}
 
-		//collide and change state if necessary
-
-		// separate into quadrants
-		for _, part := range partitions {
-			part.ClearPoints()
-			part.AddPoints(points)
-		}
-
-		// collide within partitions
-		for _, part := range partitions {
-			part.CollideWithin(
-				func(p, other *Point) bool {
-					return p.Collides(other)
-				},
-				func(p *Point) {
-					p.C = colornames.Black
-					p.Frozen = true
-				})
-		}
-
+		// draw batch to window
 		win.Clear(colornames.White)
 		batch.Draw(win)
+
 		win.Update()
 
+		//add more points if space bar pressed
 		if win.JustPressed(pixelgl.KeySpace) {
-			//add more points if space bar pressed
-			points = addRandPoints(points, 50, rand.Intn(9)+1)
+			points = addRandPoints(points, 50, rand.Intn(8)+3)
 			fmt.Println("num points:", len(points))
 		}
 
 		frames++
 		select {
 		case <-second:
-			win.SetTitle(fmt.Sprintf("%d fps", frames))
+			win.SetTitle(fmt.Sprintf("%d fps, %d iter/s",
+				frames, iterations))
 			frames = 0
+			iterations = 0
 
 		default:
 		}

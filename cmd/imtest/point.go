@@ -5,7 +5,6 @@ import (
 
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/imdraw"
-	"golang.org/x/image/colornames"
 )
 
 type Point struct {
@@ -19,7 +18,7 @@ type Point struct {
 
 // KILL ALL HUMANS
 func NewPoint(x, y, r float64) *Point {
-	return &Point{x, y, r, colornames.Gray, false, imdraw.New(nil)}
+	return &Point{x, y, r, POINT_COLOR, false, imdraw.New(nil)}
 }
 
 func (p *Point) Draw() {

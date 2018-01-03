@@ -16,11 +16,19 @@ func (part *Partition) ClearPoints() {
 	part.Points = make([]*Point, 0, 200)
 }
 
-func (part *Partition) AddPoints(points []*Point) {
+func (part *Partition) AddPoints(points []*Point, applyColor bool) {
 	for _, p := range points {
 		if part.ShouldContain(p) {
 			part.Points = append(part.Points, p)
-			p.C = part.C
+			if applyColor {
+				p.C = part.C
+			} else if p.C == part.C {
+				if p.Frozen {
+					p.C = FROZEN_COLOR
+				} else {
+					p.C = POINT_COLOR
+				}
+			}
 		}
 	}
 }
