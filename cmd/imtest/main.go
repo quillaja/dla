@@ -8,15 +8,13 @@ import (
 
 	"golang.org/x/image/colornames"
 
-	"github.com/faiface/pixel/imdraw"
-
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/pixelgl"
 )
 
 const (
 	WIDTH  = 1200
-	HEIGHT = 800
+	HEIGHT = 900
 )
 
 func randFloat(low, high float64) float64 {
@@ -33,48 +31,21 @@ func clamp(num, min, max float64) float64 {
 	return num
 }
 
-type Point struct {
-	X float64
-	Y float64
-	R float64
-	C color.RGBA
-	v *imdraw.IMDraw
-}
-
-// KILL ALL HUMANS
-func NewPoint(x, y, r float64) *Point {
-	return &Point{x, y, r, colornames.Red, imdraw.New(nil)}
-}
-
-func (p *Point) Draw() {
-	p.v.Reset()
-	p.v.Clear()
-	p.v.Color = p.C
-	p.v.Push(pixel.V(p.X, p.Y))
-	p.v.Circle(p.R, 0)
-}
-
-func (p *Point) UpdatePosition() {
-	p.X += randFloat(-5, 5)
-	p.Y += randFloat(-5, 5)
-	p.X = clamp(p.X, 0, WIDTH)
-	p.Y = clamp(p.Y, 0, HEIGHT)
-}
-
-func (p *Point) Visual() *imdraw.IMDraw {
-	return p.v
-}
-
-func (p *Point) CollidesAny(others map[*Point]bool) bool {
-	for other := range others {
-		dx := other.X - p.X
-		dy := other.Y - p.Y
-		r := other.R + p.R
-		if r*r > dx*dx+dy*dy {
-			return true
-		}
+func addRandPoints(points []*Point, num ...int) []*Point {
+	if len(num) < 1 {
+		num = append(num, 50)
 	}
-	return false
+	if len(num) < 2 {
+		num = append(num, 5)
+	}
+
+	for i := 0; i < num[0]; i++ {
+		points = append(points, NewPoint(
+			randFloat(0, WIDTH),
+			randFloat(0, HEIGHT),
+			float64(num[1])))
+	}
+	return points
 }
 
 func run() {
@@ -90,25 +61,40 @@ func run() {
 		panic(err)
 	}
 
-	// create points in the center
-	numPoints := 1000
+	// create points
+	numPoints := 200
 	points := make([]*Point, 0, numPoints)
-	for i := 0; i < numPoints; i++ {
-		points = append(points, NewPoint(
-			randFloat(200, 1000),
-			randFloat(100, 700),
-			5))
-	}
+	points = addRandPoints(points, numPoints)
 
-	// create seed and list of frozens
-	frozen := map[*Point]bool{}
+	// create seed in center
 	seed := NewPoint(WIDTH/2, HEIGHT/2, 2)
-	seed.C = colornames.Blue
-	frozen[seed] = true
+	seed.C = colornames.Black
+	seed.Frozen = true
 	points = append(points, seed)
 
 	// the batch
 	batch := pixel.NewBatch(&pixel.TrianglesData{}, nil)
+
+	// collision partitions
+	partColors := []color.RGBA{
+		colornames.Red, colornames.Green, colornames.Blue,
+		colornames.Yellow, colornames.Brown, colornames.Cyan,
+		colornames.Darkred}
+	numParts := len(partColors) + 1
+	partitions := make(map[string]*Partition)
+	for w := 0; w < numParts; w++ {
+		for h := 0; h < numParts; h++ {
+			name := fmt.Sprintf("%d,%d", w, h)
+			p := NewPartition()
+			p.Left = float64(w * (WIDTH / numParts))
+			p.Right = float64((w + 1) * (WIDTH / numParts))
+			p.Bottom = float64(h * (HEIGHT / numParts))
+			p.Top = float64((h + 1) * (HEIGHT / numParts))
+			p.C = partColors[(w+h)%len(partColors)]
+			partitions[name] = p
+			// fmt.Println(name, p)
+		}
+	}
 
 	// performance
 	frames := 0
@@ -118,39 +104,49 @@ func run() {
 
 		batch.Clear()
 
+		// draw
 		for _, p := range points {
-			if !frozen[p] {
-				p.UpdatePosition()
-			}
+			p.UpdatePosition()
 			p.Draw()
 			p.Visual().Draw(batch)
+		}
 
-			//collide and change state if necessary
-			if _, in := frozen[p]; !in {
-				if p.CollidesAny(frozen) {
-					// freeze p
-					p.C = colornames.Blue
-					frozen[p] = true
-				}
-			}
+		//collide and change state if necessary
+
+		// separate into quadrants
+		for _, part := range partitions {
+			part.ClearPoints()
+			part.AddPoints(points)
+		}
+
+		// collide within partitions
+		for _, part := range partitions {
+			part.CollideWithin(
+				func(p, other *Point) bool {
+					return p.Collides(other)
+				},
+				func(p *Point) {
+					p.C = colornames.Black
+					p.Frozen = true
+				})
 		}
 
 		win.Clear(colornames.White)
 		batch.Draw(win)
 		win.Update()
 
+		if win.JustPressed(pixelgl.KeySpace) {
+			//add more points if space bar pressed
+			points = addRandPoints(points, 50, rand.Intn(9)+1)
+			fmt.Println("num points:", len(points))
+		}
+
 		frames++
 		select {
 		case <-second:
 			win.SetTitle(fmt.Sprintf("%d fps", frames))
 			frames = 0
-			fmt.Println(len(points), len(frozen))
 
-			// add another point every second
-			// points = append(points, NewPoint(
-			// 	randFloat(200, 1000),
-			// 	randFloat(100, 700),
-			// 	5))
 		default:
 		}
 	}
