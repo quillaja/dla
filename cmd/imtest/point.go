@@ -2,6 +2,7 @@ package main
 
 import (
 	"image/color"
+	"math/rand"
 
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/imdraw"
@@ -41,8 +42,7 @@ func (p *Point) Draw() {
 
 func (p *Point) UpdatePosition() {
 	if !p.Frozen {
-		p.X += randFloat(-POINT_SPEED, POINT_SPEED)
-		p.Y += randFloat(-POINT_SPEED, POINT_SPEED)
+		p.X, p.Y = centerDrift(p.X, p.Y) // randomMovement(p.X, p.Y)
 
 		p.X = clamp(p.X, 0, WIDTH)
 		p.Y = clamp(p.Y, 0, HEIGHT)
@@ -65,4 +65,23 @@ func (p *Point) Collides(other *Point) bool {
 		}
 	}
 	return false
+}
+
+func randomMovement(x, y float64) (float64, float64) {
+	return x + randFloat(-POINT_SPEED, POINT_SPEED),
+		y + randFloat(-POINT_SPEED, POINT_SPEED)
+}
+
+func centerDrift(x, y float64) (float64, float64) {
+	// go directly towards center 2% of the time
+	if rand.Float32() < 0.02 {
+		pos := pixel.V(x, y)
+		center := pixel.V(WIDTH/2, HEIGHT/2)
+		delta := pos.To(center).
+			Unit().
+			Scaled(POINT_SPEED)
+		return x + delta.X, y + delta.Y
+	}
+
+	return randomMovement(x, y)
 }

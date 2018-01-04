@@ -112,11 +112,13 @@ func run() {
 	// options
 	showPartitions := false
 	paused := false
+	hideMovers := false
 
 	// performance
 	frames := 0
 	iterations := 0
 	second := time.Tick(1 * time.Second)
+	age := 0
 
 	// run logic
 	go func() {
@@ -181,6 +183,10 @@ func run() {
 		if win.JustPressed(pixelgl.KeyB) {
 			showPartitions = !showPartitions
 		}
+		// allow toggle of hiding moving points
+		if win.JustPressed(pixelgl.KeyM) {
+			hideMovers = !hideMovers
+		}
 		cam.Zoom *= math.Pow(cam.ZSpeed, win.MouseScroll().Y)
 
 		if !paused {
@@ -188,10 +194,12 @@ func run() {
 
 			// draw to batch
 			for _, p := range points {
-				// if .Left-p.R <= p.X && p.X <= .Right+p.R &&
-				// .Bottom-p.R <= p.Y && p.Y <= .Top+p.R {
 				p.Draw()
-				p.Visual().Draw(batch)
+				if hideMovers && p.Frozen {
+					p.Visual().Draw(batch)
+				} else if !hideMovers {
+					p.Visual().Draw(batch)
+				}
 			}
 
 		}
@@ -210,10 +218,11 @@ func run() {
 		frames++
 		select {
 		case <-second:
-			win.SetTitle(fmt.Sprintf("%d fps, %d iter/s",
-				frames, iterations))
+			win.SetTitle(fmt.Sprintf("%d fps, %d iter/s, age %d s",
+				frames, iterations, age))
 			frames = 0
 			iterations = 0
+			age++
 		default:
 		}
 	}
