@@ -14,13 +14,14 @@ type Point struct {
 	R      float64
 	C      color.RGBA
 	Frozen bool
+	Age    int
 	v      *imdraw.IMDraw
 	dirty  bool
 }
 
 // KILL ALL HUMANS
 func NewPoint(x, y, r float64) *Point {
-	return &Point{x, y, r, POINT_COLOR, false, imdraw.New(nil), true}
+	return &Point{x, y, r, POINT_COLOR, false, 0, imdraw.New(nil), true}
 }
 
 func (p *Point) SetColor(c color.RGBA) {
@@ -35,6 +36,15 @@ func (p *Point) Draw() {
 		p.v.Color = p.C
 		p.v.Push(pixel.V(p.X, p.Y))
 		p.v.Circle(p.R, 0)
+		// if p.Frozen {
+		// 	p.v.Color = color.RGBA{
+		// 		R: clampInt255(int(p.C.R) - 16),
+		// 		G: clampInt255(int(p.C.G) - 16),
+		// 		B: clampInt255(int(p.C.B) - 16),
+		// 		A: p.C.A}
+		// 	p.v.Push(pixel.V(p.X, p.Y))
+		// 	p.v.Circle(p.R, 0.5)
+		// }
 
 		p.dirty = false
 	}
@@ -42,7 +52,7 @@ func (p *Point) Draw() {
 
 func (p *Point) UpdatePosition() {
 	if !p.Frozen {
-		p.X, p.Y = centerDrift(p.X, p.Y) // randomMovement(p.X, p.Y)
+		p.X, p.Y = randomMovement(p.X, p.Y) // centerDrift(p.X, p.Y)
 
 		p.X = clamp(p.X, 0, WIDTH)
 		p.Y = clamp(p.Y, 0, HEIGHT)
@@ -84,4 +94,14 @@ func centerDrift(x, y float64) (float64, float64) {
 	}
 
 	return randomMovement(x, y)
+}
+
+func clampInt255(i int) uint8 {
+	if i < 0 {
+		return 0
+	}
+	if i > 255 {
+		return 255
+	}
+	return uint8(i)
 }

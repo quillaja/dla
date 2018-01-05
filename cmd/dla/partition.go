@@ -24,7 +24,7 @@ func (part *Partition) AddPoints(points []*Point, applyColor bool) {
 				p.SetColor(part.C)
 			} else if p.C == part.C {
 				if p.Frozen {
-					p.SetColor(FROZEN_COLOR)
+					p.SetColor(COLOR_RAMP[p.Age])
 				} else {
 					p.SetColor(POINT_COLOR)
 				}

@@ -17,13 +17,18 @@ const (
 	WIDTH         = 1200
 	HEIGHT        = 900
 	POINT_MAXSIZE = 10
-	POINT_SPEED   = 2
+	POINT_SPEED   = 1
 )
 
 var (
-	POINT_COLOR      = colornames.Cornflowerblue
-	FROZEN_COLOR     = colornames.Ivory
+	POINT_COLOR      = colornames.Ivory
+	FROZEN_COLOR     = colornames.Cornflowerblue
 	BACKGROUND_COLOR = colornames.Black
+	COLOR_RAMP       = MakeColorRamp([]color.RGBA{
+		colornames.Red,
+		colornames.White,
+		colornames.Blue,
+		colornames.Green}, 120)
 )
 
 type camera struct {
@@ -49,9 +54,25 @@ func clamp(num, min, max float64) float64 {
 
 func addRandPoints(points []*Point, num int) []*Point {
 	for i := 0; i < num; i++ {
+		x, y := 0.0, 0.0
+		dist := 500.0
+		switch rand.Int() % 4 {
+		case 0:
+			x = randFloat(WIDTH-dist, WIDTH)
+			y = randFloat(0, HEIGHT)
+		case 1:
+			x = randFloat(0, dist)
+			y = randFloat(0, HEIGHT)
+		case 2:
+			x = randFloat(0, WIDTH)
+			y = randFloat(HEIGHT-dist, HEIGHT)
+		case 3:
+			x = randFloat(0, WIDTH)
+			y = randFloat(0, dist)
+		}
 		points = append(points, NewPoint(
-			randFloat(0, WIDTH),
-			randFloat(0, HEIGHT),
+			x,
+			y,
 			randFloat(3, POINT_MAXSIZE)))
 	}
 	return points
@@ -71,13 +92,13 @@ func run() {
 	}
 
 	// create points
-	numPoints := 200
+	numPoints := 2400
 	points := make([]*Point, 0, numPoints)
 	points = addRandPoints(points, numPoints)
 
 	// create seed in center
 	seed := NewPoint(WIDTH/2, HEIGHT/2, 2)
-	seed.C = FROZEN_COLOR
+	seed.C = COLOR_RAMP[seed.Age]
 	seed.Frozen = true
 	points = append(points, seed)
 
@@ -112,7 +133,7 @@ func run() {
 	// options
 	showPartitions := false
 	paused := false
-	hideMovers := false
+	hideMovers := true
 
 	// performance
 	frames := 0
@@ -142,8 +163,12 @@ func run() {
 							return p.Collides(other)
 						},
 						func(p *Point) {
-							p.SetColor(FROZEN_COLOR)
 							p.Frozen = true
+							p.Age = age
+							if p.Age >= len(COLOR_RAMP) {
+								p.Age = len(COLOR_RAMP) - 1
+							}
+							p.SetColor(COLOR_RAMP[p.Age])
 						})
 				}
 
